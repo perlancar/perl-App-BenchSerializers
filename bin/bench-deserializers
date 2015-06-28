@@ -1,0 +1,50 @@
+#!perl
+
+# DATE
+# VERSION
+
+use 5.010001;
+use strict;
+use warnings;
+
+use App::BenchSerializers;
+use Benchmark::Dumb qw(cmpthese);
+use Module::Load;
+
+my $contestants = \%App::BenchSerializers::contestants;
+my $data = \%App::BenchSerializers::data;
+
+my @mods = grep {
+    $contestants->{$_}{serialize} && $contestants->{$_}{deserialize}
+} sort keys %$contestants;
+
+# load the modules
+for my $mod (@mods) { load $mod }
+
+# benchmark
+for my $k (sort keys %$data) {
+    my $v = $data->{$k};
+    next unless ref($v->{data});
+    say "Deserializing $k ($v->{summary}):";
+    my %codes;
+    for my $mod (@mods) {
+        my $datum = $contestants->{$mod}{serialize}->($v->{data});
+        $codes{$mod} = sub { $contestants->{$mod}{deserialize}->($datum) };
+    }
+    cmpthese(0, \%codes);
+    say "";
+}
+
+# ABSTRACT: Benchmark Perl data deserialization modules
+# PODNAME:
+
+=head1 SYNOPSIS
+
+ % bench-deserializers
+
+Sample output:
+
+# COMMAND: perl -Ilib bin/bench-deserializers
+
+
+=head1 SEE ALSO

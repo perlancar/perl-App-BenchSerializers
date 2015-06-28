@@ -1,4 +1,4 @@
-package App::BenchTextTableModules;
+package App::BenchSerializers;
 
 # DATE
 # VERSION
@@ -7,86 +7,139 @@ use 5.010001;
 use strict;
 use warnings;
 
-sub _make_table {
-    my ($cols, $rows) = @_;
-    my $res = [];
-    push @$res, [];
-    for (0..$cols-1) { $res->[0][$_] = "col" . ($_+1) }
-    for my $row (1..$rows) {
-        push @$res, [ map { "row$row.$_" } 1..$cols ];
-    }
-    $res;
-}
-
-our %tables = (
-    '0tiny(1x1)'     => _make_table( 1, 1),
-    '1small(3x5)'    => _make_table( 3, 5),
-    '2wide(30x5)'    => _make_table(30, 5),
-    '3long(3x300)'   => _make_table( 3, 300),
-    '4large(30x300)' => _make_table(30, 300),
+our %data = (
+    undef => {
+        summary => 'undef',
+        data => undef,
+    },
+    num => {
+        summary => 'A single number (-1.23)',
+        data => -1.23,
+    },
+    str1k => {
+        summary => 'A string 1024-character long',
+        data => 'a' x 1024,
+    },
+    array_int10 => {
+        summary => 'A 10-element array containing ints',
+        data => [1..10],
+    },
+    # XXX more data
 );
 
 our %contestants = (
-    'Text::ANSITable' => sub {
-        my ($table) = @_;
-        my $t = Text::ANSITable->new(
-            use_utf8 => 0,
-            use_box_chars => 0,
-            use_color => 0,
-            columns => $table->[0],
-            border_style => 'Default::single_ascii',
-        );
-        $t->add_row($table->[$_]) for 1..@$table-1;
-        $t->draw;
+    'JSON::PP' => {
+        tags => ['json'],
+        serialize => sub {
+            JSON::PP::encode_json($_[0]);
+        },
+        deserialize => sub {
+            JSON::PP::decode_json($_[0]);
+        },
     },
-    'Text::ASCIITable' => sub {
-        my ($table) = @_;
-        my $t = Text::ASCIITable->new();
-        $t->setCols(@{ $table->[0] });
-        $t->addRow(@{ $table->[$_] }) for 1..@$table-1;
-        "$t";
+    'JSON::XS' => {
+        tags => ['json'],
+        serialize => sub {
+            JSON::XS::encode_json($_[0]);
+        },
+        deserialize => sub {
+            JSON::XS::decode_json($_[0]);
+        },
     },
-    'Text::FormatTable' => sub {
-        my ($table) = @_;
-        my $t = Text::FormatTable->new(join('|', ('l') x @{ $table->[0] }));
-        $t->head(@{ $table->[0] });
-        $t->row(@{ $table->[$_] }) for 1..@$table-1;
-        $t->render;
+    'JSON::MaybeXS' => {
+        tags => ['json'],
+        serialize => sub {
+            JSON::MaybeXS::encode_json($_[0]);
+        },
+        deserialize => sub {
+            JSON::MaybeXS::decode_json($_[0]);
+        },
     },
-    'Text::MarkdownTable' => sub {
-        my ($table) = @_;
-        my $out = "";
-        my $t = Text::MarkdownTable->new(file => \$out);
-        my $fields = $table->[0];
-        foreach (1..@$table-1) {
-            my $row = $table->[$_];
-            $t->add( {
-                map { $fields->[$_] => $row->[$_] } 0..@$fields-1
-            });
-        }
-        $t->done;
-        $out;
+    'JSON::Decode::Regexp' => {
+        tags => ['json'],
+        deserialize => sub {
+            JSON::Decode::Regexp::from_json($_[0]);
+        },
     },
-    'Text::Table' => sub {
-        my ($table) = @_;
-        my $t = Text::Table->new(@{ $table->[0] });
-        $t->load(@{ $table }[1..@$table-1]);
-        $t;
+    'JSON::Decode::Marpa' => {
+        tags => ['json'],
+        deserialize => sub {
+            JSON::Decode::Marpa::from_json($_[0]);
+        },
     },
-    'Text::Table::Tiny' => sub {
-        my ($table) = @_;
-        Text::Table::Tiny::table(rows=>$table, header_row=>1);
+    'Pegex::JSON' => {
+        tags => ['json'],
+        deserialize => sub {
+            state $obj = Pegex::JSON->new;
+            $obj->load($_[0]);
+        },
     },
-    'Text::TabularDisplay' => sub {
-        my ($table) = @_;
-        my $t = Text::TabularDisplay->new(@{ $table->[0] });
-        $t->add(@{ $table->[$_] }) for 1..@$table-1;
-        $t->render; # doesn't add newline
+
+    'YAML::Old' => {
+        tags => ['yaml'],
+        serialize => sub {
+            YAML::Old::Dump($_[0]);
+        },
+        deserialize => sub {
+            YAML::Old::Load($_[0]);
+        },
+    },
+
+    'YAML::Syck' => {
+        tags => ['yaml'],
+        serialize => sub {
+            YAML::Syck::Dump($_[0]);
+        },
+        deserialize => sub {
+            YAML::Syck::Load($_[0]);
+        },
+    },
+
+    'YAML::XS' => {
+        tags => ['yaml'],
+        serialize => sub {
+            YAML::XS::Dump($_[0]);
+        },
+        deserialize => sub {
+            YAML::XS::Load($_[0]);
+        },
+    },
+
+    'Storable' => {
+        tags => ['binary', 'core'],
+        serialize => sub {
+            Storable::freeze($_[0]);
+        },
+        deserialize => sub {
+            Storable::thaw($_[0]);
+        },
+    },
+
+    'Sereal' => {
+        tags => ['binary'],
+        serialize => sub {
+            Sereal::encode_sereal($_[0]);
+        },
+        deserialize => sub {
+            Sereal::decode_sereal($_[0]);
+        },
+    },
+
+    'Data::MessagePack' => {
+        tags => ['binary'],
+        serialize => sub {
+            state $obj = Data::MessagePack->new;
+            $obj->pack($_[0]);
+        },
+        deserialize => sub {
+            state $obj = Data::MessagePack->new;
+            $obj->unpack($_[0]);
+        },
     },
 );
 
 1;
-# ABSTRACT: Benchmark Perl text table modules
+# ABSTRACT: Benchmark Perl data serialization modules
 
 =head1 SYNOPSIS
 

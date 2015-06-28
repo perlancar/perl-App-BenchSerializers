@@ -7,7 +7,7 @@ use 5.010001;
 use strict;
 use warnings;
 
-use App::BenchTextTableModules;
+use App::BenchSerializers;
 use Benchmark::Command;
 
 Benchmark::Command::run(
@@ -17,20 +17,20 @@ Benchmark::Command::run(
 
         map {
             $_ => [$^X, "-e", "use $_"],
-        } sort keys %App::BenchTextTableModules::contestants,
+        } sort keys %App::BenchSerializers::contestants,
     },
 );
 
-# ABSTRACT: Benchmark startup time of Perl text table modules
+# ABSTRACT: Benchmark startup time of Perl data serialization modules
 # PODNAME:
 
 =head1 SYNOPSIS
 
- % bench-startup-text-table-modules
+ % bench-startup-serializers
 
 Sample output:
 
-# COMMAND: perl -Ilib bin/bench-startup-text-table-modules
+# COMMAND: perl -Ilib bin/bench-startup-serializers
 
 
 =head1 SEE ALSO
